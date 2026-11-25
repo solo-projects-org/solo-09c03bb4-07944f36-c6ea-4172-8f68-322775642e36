@@ -46,6 +46,7 @@ class PublishResponse(BaseModel):
     input_files: list[str]
     day_count: int
     outcomes: list[OutcomeOut]
+    peak_open_files: int = 0
 
 
 @app.get("/health")
@@ -177,6 +178,7 @@ def publish_files(req: PublishRequest):
         input_files=m.input_files,
         day_count=len({d.date for d in m.days}),
         outcomes=[OutcomeOut(**vars(o)) for o in result.outcomes],
+        peak_open_files=result.peak_open_files,
     )
 
 

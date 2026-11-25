@@ -10,6 +10,7 @@
   batch_c_null.parquet         含空过磅时间（发布失败演示）
   batch_d_nostats.parquet      write_statistics=False（降级读明细，确认同日复用）
   batch_e_tz.parquet           带时区时间戳，含 UTC 跨日边界记录
+  batch_f_many_days.parquet    12 个 UTC 日严格交错 + 重复行（验证 >8 日资源上限）
 """
 
 from __future__ import annotations
@@ -113,6 +114,32 @@ def main(out_dir: str) -> None:
         }
     ).cast(tz_schema)
     pq.write_table(table_e, out / "batch_e_tz.parquet", compression="snappy")
+
+    # 6) 12 个 UTC 日严格交错：每一轮依次穿过所有日期，并故意制造重复行。
+    #    用来人工核对「超过 8 个日期交错」时仍只有 <=8 个同时打开文件、
+    #    每日一份成品且顺序/重复行保留。
+    rows_f = []
+    seq = 0
+    for cycle in range(10):
+        for day in range(13, 25):  # 2026-11-13 .. 2026-11-24，共 12 个 UTC 日
+            repeats = 2 if (cycle + day) % 4 == 0 else 1
+            for r in range(repeats):
+                seq += 1
+                hour = (cycle * 2 + r) % 24
+                rows_f.append((
+                    f"T-6{seq:04d}",
+                    _ts(f"2026-11-{day:02d} {hour:02d}:00:00"),
+                    f"CNTU6{seq:05d}",
+                    15000 + (seq * 137) % 9000,
+                ))
+    pq.write_table(
+        pa.table(
+            {f.name: [r[i] for r in rows_f] for i, f in enumerate(SCHEMA)},
+            schema=SCHEMA,
+        ),
+        out / "batch_f_many_days.parquet",
+        compression="snappy",
+    )
 
     for p in sorted(out.glob("*.parquet")):
         print(f"wrote {p} ({pq.ParquetFile(p).metadata.num_rows} rows)")

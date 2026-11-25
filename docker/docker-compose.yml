@@ -12,6 +12,11 @@ services:
       WEIGH_TIME_COLUMN: "weigh_time"
       WEIGH_INPUT_DIR: /data/input
       WEIGH_OUTPUT_DIR: /data/output
+      # 拆写资源上限：每批解码/写盘的明细行数；内存峰值约为其 2 倍
+      # （源批次 + 过滤副本）。明细再大也按固定批次流式拆写。
+      WEIGH_SPLIT_BATCH_ROWS: "10000"
+      # 暂存拆片 + 成品文件合计同时打开数，硬上限 8（调大无效，只会取 min）
+      WEIGH_MAX_OPEN_FILES: "8"
     volumes:
       # 原始 Parquet 挂载为只读，原档绝不动
       - ../data_in:/data/input:ro
